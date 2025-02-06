@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { User } from "@supabase/supabase-js"
 import AttendanceBarChart from "@/components/BarChart"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -43,11 +43,18 @@ export default function Reports() {
   const [user, setUser] = useState<User | null>(null)
   const [availableMonths, setAvailableMonths] = useState<string[]>([])
   const [selectedMonth, setSelectedMonth] = useState<string>("")
+  const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
 
   useEffect(() => {
     checkSession()
   }, [])
+
+  useEffect(() => {
+    if (attendanceData.length > 0 && selectedMonth) {
+      processChartData(attendanceData)
+    }
+  }, [selectedMonth, attendanceData])
 
   const checkSession = async () => {
     try {
@@ -84,7 +91,6 @@ export default function Reports() {
     
     setAttendanceData(data || [])
     processAvailableMonths(data)
-    processChartData(data)
   }
 
   const processAvailableMonths = (data: AttendanceRecord[]) => {
@@ -122,11 +128,13 @@ export default function Reports() {
       }
     })
 
-    const processedData = Object.entries(memberAttendance).map(([name, record]) => ({
-      name,
-      present: record.present,
-      absent: record.absent
-    }))
+    const processedData = Object.entries(memberAttendance)
+      .sort(([nameA], [nameB]) => nameA.localeCompare(nameB))
+      .map(([name, record]) => ({
+        name,
+        present: record.present,
+        absent: record.absent
+      }))
 
     setChartData(processedData)
   }
@@ -134,21 +142,16 @@ export default function Reports() {
   const getMonthlyAttendanceReport = (): MonthlyReport => {
     if (!selectedMonth) return {}
 
-    const [year, month] = selectedMonth.split('-').map(Number)
-    
-    // Get all attendance records for the selected month
     const monthlyRecords = attendanceData.filter(record => {
       const recordDate = new Date(record.date)
       const recordMonth = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`
       return recordMonth === selectedMonth
     })
 
-    // Get unique dates where attendance was marked
     const workingDays = new Set(monthlyRecords.map(record => record.date)).size
 
     const report: MonthlyReport = {}
 
-    // Initialize report for all members
     const uniqueMembers = new Set(monthlyRecords.map(record => record.members.name))
     uniqueMembers.forEach(memberName => {
       const memberRecord = monthlyRecords.find(record => record.members.name === memberName)
@@ -157,7 +160,7 @@ export default function Reports() {
           name: memberName,
           department: memberRecord.members.department,
           role: memberRecord.members.role,
-          workingDays: workingDays, // Use actual working days
+          workingDays: workingDays,
           present: 0,
           absent: 0,
           attendancePercentage: 0,
@@ -166,7 +169,6 @@ export default function Reports() {
       }
     })
 
-    // Process attendance records
     monthlyRecords.forEach(record => {
       const memberName = record.members.name
       if (record.is_present) {
@@ -177,12 +179,22 @@ export default function Reports() {
       }
     })
 
-    // Calculate percentages
     Object.values(report).forEach(record => {
       record.attendancePercentage = (record.present / workingDays) * 100
     })
 
     return report
+  }
+
+  const getFilteredAndSortedReport = () => {
+    const report = getMonthlyAttendanceReport()
+    return Object.values(report)
+      .filter(record => 
+        record.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.department.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        record.role.toLowerCase().includes(searchQuery.toLowerCase())
+      )
+      .sort((a, b) => a.name.localeCompare(b.name))
   }
 
   const formatMonthDisplay = (monthStr: string) => {
@@ -215,21 +227,18 @@ export default function Reports() {
 
       <div className="max-w-7xl mx-auto">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <Image
-          src="/logo.png"
-          alt="SGC Logo"
-          width={100}
-          height={100}
-        />
+          <Image
+            src="/logo.png"
+            alt="SGC Logo"
+            width={100}
+            height={100}
+          />
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">
             Monthly Attendance Reports
           </h1>
           <select
             value={selectedMonth}
-            onChange={(e) => {
-              setSelectedMonth(e.target.value)
-              processChartData(attendanceData)
-            }}
+            onChange={(e) => setSelectedMonth(e.target.value)}
             className="w-full sm:w-auto px-3 sm:px-4 py-2 border-2 border-black rounded-lg bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
           >
             {availableMonths.map((month) => (
@@ -241,7 +250,7 @@ export default function Reports() {
         </div>
 
         {chartData.length > 0 && (
-          <div className="bg-white border-2 border-black rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-3 sm:p-6 mb-6">
+          <div className="hidden md:block bg-white border-2 border-black rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-3 sm:p-6 mb-6">
             <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">Attendance Overview</h2>
             <div className="h-[300px] sm:h-[400px]">
               <AttendanceBarChart data={chartData} />
@@ -250,9 +259,22 @@ export default function Reports() {
         )}
 
         <div className="bg-white border-2 border-black rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-3 sm:p-6">
-          <h2 className="text-lg sm:text-xl md:text-2xl font-bold mb-4">
-            Monthly Attendance Record - {formatMonthDisplay(selectedMonth)}
-          </h2>
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h2 className="text-lg sm:text-xl md:text-2xl font-bold">
+              Monthly Attendance Record - {formatMonthDisplay(selectedMonth)}
+            </h2>
+            
+            <div className="relative w-full sm:w-64">
+              <input
+                type="text"
+                placeholder="Search members..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full px-3 py-2 pl-10 border-2 border-black rounded-lg bg-white shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-black"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+            </div>
+          </div>
           
           <div className="overflow-x-auto -mx-3 sm:-mx-6">
             <div className="inline-block min-w-full align-middle">
@@ -271,7 +293,7 @@ export default function Reports() {
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-black bg-white">
-                    {Object.values(getMonthlyAttendanceReport()).map((data) => (
+                    {getFilteredAndSortedReport().map((data) => (
                       <tr key={data.name} className="hover:bg-gray-50">
                         <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-xs sm:text-sm font-medium">{data.name}</td>
                         <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-xs sm:text-sm">{data.department}</td>
@@ -298,10 +320,10 @@ export default function Reports() {
                         </td>
                       </tr>
                     ))}
-                    {Object.keys(getMonthlyAttendanceReport()).length === 0 && (
+                    {getFilteredAndSortedReport().length === 0 && (
                       <tr>
                         <td colSpan={8} className="px-2 sm:px-4 py-8 text-center text-gray-500 text-sm">
-                          No attendance records found for {formatMonthDisplay(selectedMonth)}
+                          {searchQuery ? 'No matching records found' : `No attendance records found for ${formatMonthDisplay(selectedMonth)}`}
                         </td>
                       </tr>
                     )}

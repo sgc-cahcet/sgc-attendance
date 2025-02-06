@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { User } from "@supabase/supabase-js"
-import { ArrowLeft } from "lucide-react"
+import { ArrowLeft, Search } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -26,6 +26,7 @@ export default function MemberManagement() {
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
   const [selectedMembers, setSelectedMembers] = useState<number[]>([])
+  const [searchQuery, setSearchQuery] = useState("")
   const router = useRouter()
   
   const emptyMember: Omit<Member, 'id'> = {
@@ -70,6 +71,31 @@ export default function MemberManagement() {
     else setMembers(data || [])
   }
 
+  // Sort and filter members
+  const sortedAndFilteredMembers = useMemo(() => {
+    const yearOrder = { "IV": 1, "III": 2, "II": 3, "I": 4 }
+    
+    return members
+      .filter(member => {
+        const searchLower = searchQuery.toLowerCase()
+        return (
+          member.name.toLowerCase().includes(searchLower) ||
+          member.department.toLowerCase().includes(searchLower) ||
+          member.role.toLowerCase().includes(searchLower) ||
+          member.email.toLowerCase().includes(searchLower) ||
+          member.mobile.includes(searchQuery)
+        )
+      })
+      .sort((a, b) => {
+        // First sort by academic year
+        if (yearOrder[a.academicYear as keyof typeof yearOrder] !== yearOrder[b.academicYear as keyof typeof yearOrder]) {
+          return yearOrder[a.academicYear as keyof typeof yearOrder] - yearOrder[b.academicYear as keyof typeof yearOrder]
+        }
+        // Then sort alphabetically by name within the same year
+        return a.name.localeCompare(b.name)
+      })
+  }, [members, searchQuery])
+
   const addMember = async (e: React.FormEvent) => {
     e.preventDefault()
     const { data, error } = await supabase.from("members").insert([newMember])
@@ -111,10 +137,10 @@ export default function MemberManagement() {
   }
 
   const toggleSelectAll = () => {
-    if (selectedMembers.length === members.length) {
+    if (selectedMembers.length === sortedAndFilteredMembers.length) {
       setSelectedMembers([])
     } else {
-      setSelectedMembers(members.map(member => member.id))
+      setSelectedMembers(sortedAndFilteredMembers.map(member => member.id))
     }
   }
 
@@ -162,21 +188,22 @@ export default function MemberManagement() {
   return (
     <div className="min-h-screen bg-[#f0f0f0] p-2 sm:p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
-      <Link 
+        <Link 
           href="/admin/dashboard" 
           className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 group"
         >
           <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
           <span className="text-sm font-medium">Back to Dashboard</span>
         </Link>
+
         {/* Header Section */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-8">
-        <Image
-          src="/logo.png"
-          alt="SGC Logo"
-          width={100}
-          height={100}
-        />
+          <Image
+            src="/logo.png"
+            alt="SGC Logo"
+            width={100}
+            height={100}
+          />
           <h1 className="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight">Member Management</h1>
           <div className="flex flex-wrap gap-2 sm:gap-4">
             {selectedMembers.length > 0 && (
@@ -196,6 +223,20 @@ export default function MemberManagement() {
           </div>
         </div>
 
+        {/* Search Bar */}
+        <div className="mb-6">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
+            <input
+              type="text"
+              placeholder="Search members by name, department, mobile..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 text-sm border-2 border-black rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+        </div>
+
         {/* Responsive Table */}
         <div className="bg-white rounded-md border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] overflow-hidden">
           <div className="overflow-x-auto">
@@ -206,7 +247,7 @@ export default function MemberManagement() {
                     <th scope="col" className="p-2 sm:p-4">
                       <input
                         type="checkbox"
-                        checked={selectedMembers.length === members.length}
+                        checked={selectedMembers.length === sortedAndFilteredMembers.length}
                         onChange={toggleSelectAll}
                         className="w-4 h-4"
                       />
@@ -221,7 +262,7 @@ export default function MemberManagement() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-black bg-white">
-                  {members.map((member) => (
+                  {sortedAndFilteredMembers.map((member) => (
                     <tr key={member.id} className="hover:bg-gray-50">
                       <td className="p-2 sm:p-4">
                         <input
@@ -380,7 +421,8 @@ export default function MemberManagement() {
 
                 <div>
                   <label className="block text-sm font-medium mb-1 sm:mb-2">Role</label>
-                  <select value={editingMember.role}
+                  <select 
+                    value={editingMember.role}
                     onChange={(e) => setEditingMember({ 
                       ...editingMember, 
                       role: e.target.value 

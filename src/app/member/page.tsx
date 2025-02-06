@@ -2,6 +2,7 @@
 
 import { useState, FormEvent } from "react"
 import { supabase } from "@/lib/supabase"
+import Image from "next/image"
 
 export default function MemberView() {
   const [memberData, setMemberData] = useState<any>(null)
@@ -68,6 +69,13 @@ export default function MemberView() {
   return (
     <div className="min-h-screen bg-[#f0f0f0] p-2 sm:p-4 md:p-8 flex justify-center items-center">
       <div className="w-full max-w-2xl bg-white border-2 border-black rounded-lg shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] p-4 sm:p-6">
+      <Image 
+        src="/logo.png"
+        alt="SGC Logo"
+        fill
+        className="object-contain"
+        priority
+      />
         <h2 className="text-2xl sm:text-3xl font-black text-center mb-6 tracking-tight">
           Member Attendance View
         </h2>

@@ -5,8 +5,8 @@ import type React from "react" // Import React
 const inter = Inter({ subsets: ["latin"] })
 
 export const metadata = {
-  title: "College Attendance System",
-  description: "Manage attendance and leave for college community",
+  title: "SGC Attendance Management System",
+  description: "A simple attendance management system for the SGC",
 }
 
 export default function RootLayout({

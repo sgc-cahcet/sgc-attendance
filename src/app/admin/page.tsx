@@ -54,6 +54,10 @@ export default function Home() {
           </Link>
         </div>
       </main>
+      <div className="mt-8 text-center text-gray-500 text-xs">
+        <p>This Site was Developed and Maintained by SGC</p>
+          <p>&copy; {new Date().getFullYear()} Students Guidance Cell - CAHCET. All Rights Reserved</p>
+        </div>
     </div>
   )
 }

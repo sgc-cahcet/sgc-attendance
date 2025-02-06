@@ -150,7 +150,7 @@ export default function DailyAttendance() {
 
   const renderYearCard = (year: string, members: Member[]) => (
     <Card key={year} className="mb-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow">
-      <div className="bg-yellow-100 border-b-2 border-black p-4">
+      <div className="bg-yellow-100 border-b-2 border-black p-4 rounded-t-md">
         <h3 className="text-xl font-bold">{year} Year Students</h3>
         <p className="text-sm text-gray-600 mt-1">{members.length} members</p>
       </div>

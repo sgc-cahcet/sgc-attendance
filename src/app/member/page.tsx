@@ -4,12 +4,62 @@ import { useState, FormEvent } from "react"
 import { supabase } from "@/lib/supabase"
 import Image from "next/image"
 
+interface MonthlyAttendance {
+  month: string
+  workingDays: number
+  presentDays: number
+  absentDays: number
+  attendancePercentage: number
+  absentDates: string[]
+}
+
+interface MemberDataWithMonthly extends Record<string, any> {
+  monthlyAttendance: MonthlyAttendance[]
+}
+
 export default function MemberView() {
-  const [memberData, setMemberData] = useState<any>(null)
+  const [memberData, setMemberData] = useState<MemberDataWithMonthly | null>(null)
   const [searchType, setSearchType] = useState<'email' | 'mobile'>('email')
   const [searchValue, setSearchValue] = useState("")
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState("")
+
+  const formatMonthDisplay = (dateStr: string) => {
+    const date = new Date(dateStr)
+    return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+  }
+
+  const groupAttendanceByMonth = (attendanceData: any[]) => {
+    const monthlyGroups = attendanceData.reduce((acc: Record<string, any[]>, record: any) => {
+      const month = record.date.substring(0, 7) // Get YYYY-MM format
+      if (!acc[month]) {
+        acc[month] = []
+      }
+      acc[month].push(record)
+      return acc
+    }, {})
+
+    return Object.entries(monthlyGroups).map(([month, records]) => {
+      const workingDays = new Set(records.map(record => record.date)).size
+      const presentDays = records.filter(record => record.is_present).length
+      const absentDays = workingDays - presentDays
+      const attendancePercentage = (presentDays / workingDays) * 100
+
+      const absentDates = records
+        .filter(record => !record.is_present)
+        .map(record => new Date(record.date).toLocaleDateString())
+        .sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime())
+
+      return {
+        month,
+        workingDays,
+        presentDays,
+        absentDays,
+        attendancePercentage,
+        absentDates
+      }
+    }).sort((a, b) => b.month.localeCompare(a.month)) // Sort by most recent month first
+  }
 
   const fetchMemberData = async (e: FormEvent) => {
     e.preventDefault()
@@ -41,23 +91,11 @@ export default function MemberView() {
         return
       }
 
-      const totalDays = attendanceData.length
-      const presentDays = attendanceData.filter((record: any) => record.is_present).length
-      const absentDays = totalDays - presentDays
-      const attendancePercentage = totalDays ? (presentDays / totalDays) * 100 : 0
+      const monthlyAttendance = groupAttendanceByMonth(attendanceData)
       
-      const absentDates = attendanceData
-        .filter((record: any) => !record.is_present)
-        .map((record: any) => new Date(record.date).toLocaleDateString())
-        .sort((a: string, b: string) => new Date(a).getTime() - new Date(b).getTime())
-
       setMemberData({
         ...memberData,
-        totalDays,
-        presentDays,
-        absentDays,
-        attendancePercentage,
-        absentDates
+        monthlyAttendance
       })
     } catch (error) {
       setError("An unexpected error occurred. Please try again later.")
@@ -134,7 +172,7 @@ export default function MemberView() {
           </div>
         )}
 
-        {memberData && (
+{memberData && (
           <div className="mt-8 space-y-6">
             <div className="bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4">
               <h3 className="text-lg sm:text-xl font-black mb-4">Member Information</h3>
@@ -147,54 +185,59 @@ export default function MemberView() {
               </table>
             </div>
 
-            <div className="bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4">
-              <h3 className="text-lg sm:text-xl font-black mb-4">Attendance Summary</h3>
-              <table className="w-full text-sm">
-                <tbody className="divide-y-2 divide-black">
-                  <tr><td className="py-2 font-bold">Total Working Days:</td><td>{memberData.totalDays}</td></tr>
-                  <tr><td className="py-2 font-bold">Present Days:</td><td>{memberData.presentDays}</td></tr>
-                  <tr><td className="py-2 font-bold">Absent Days:</td><td>{memberData.absentDays}</td></tr>
-                  <tr>
-                    <td className="py-2 font-bold">Attendance Percentage:</td>
-                    <td>
-                      <span className={`inline-flex px-2 py-1 rounded-md border-2 border-black ${
-                        memberData.attendancePercentage < 75 
-                          ? 'bg-red-100 text-red-700' 
-                          : 'bg-green-100 text-green-700'
-                      }`}>
-                        {memberData.attendancePercentage.toFixed(2)}%
-                      </span>
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
+            {memberData.monthlyAttendance.map((month, index) => (
+              <div key={index} className="bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4">
+                <h3 className="text-lg sm:text-xl font-black mb-4">
+                  {formatMonthDisplay(month.month)}
+                </h3>
+                <table className="w-full text-sm">
+                  <tbody className="divide-y-2 divide-black">
+                    <tr><td className="py-2 font-bold">Working Days:</td><td>{month.workingDays}</td></tr>
+                    <tr><td className="py-2 font-bold">Present Days:</td><td>{month.presentDays}</td></tr>
+                    <tr><td className="py-2 font-bold">Absent Days:</td><td>{month.absentDays}</td></tr>
+                    <tr>
+                      <td className="py-2 font-bold">Attendance Percentage:</td>
+                      <td>
+                        <span className={`inline-flex px-2 py-1 rounded-md border-2 border-black ${
+                          month.attendancePercentage < 75 
+                            ? 'bg-red-100 text-red-700' 
+                            : 'bg-green-100 text-green-700'
+                        }`}>
+                          {month.attendancePercentage.toFixed(2)}%
+                        </span>
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
 
-            {memberData.absentDates.length > 0 && (
-              <div className="bg-white border-2 border-black rounded-lg shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] p-4">
-                <h3 className="text-lg sm:text-xl font-black mb-4">Absence Dates (MM/DD/YYYY)</h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                  {memberData.absentDates.map((date: string, index: number) => (
-                    <div 
-                      key={index} 
-                      className="bg-gray-100 border-2 border-black rounded-lg p-2 text-center text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
-                    >
-                      {date}
+                {month.absentDates.length > 0 && (
+                  <div className="mt-4">
+                    <h4 className="font-bold mb-2">Absence Dates:</h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {month.absentDates.map((date, dateIndex) => (
+                        <div 
+                          key={dateIndex} 
+                          className="bg-gray-100 border-2 border-black rounded-lg p-2 text-center text-sm shadow-[2px_2px_0px_0px_rgba(0,0,0,1)]"
+                        >
+                          {date}
+                        </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            {memberData.attendancePercentage < 75 && (
-              <div className="bg-red-100 border-2 border-red-500 rounded-lg p-4 text-red-700 font-medium shadow-[4px_4px_0px_0px_rgba(239,68,68,1)]">
-                ⚠️ Attendance Alert: Your attendance is below 75%
+                {month.attendancePercentage < 75 && (
+                  <div className="mt-4 bg-red-100 border-2 border-red-500 rounded-lg p-4 text-red-700 font-medium shadow-[4px_4px_0px_0px_rgba(239,68,68,1)]">
+                    ⚠️ Attendance Alert: Attendance for {formatMonthDisplay(month.month)} is below 75%
+                  </div>
+                )}
               </div>
-            )}
+            ))}
           </div>
         )}
+
         <div className="mt-8 text-center text-gray-500 text-xs">
-        <p>This Site was Developed and Maintained by SGC</p>
+          <p>This Site was Developed and Maintained by SGC</p>
           <p>&copy; {new Date().getFullYear()} Students Guidance Cell - CAHCET. All Rights Reserved</p>
         </div>
       </div>

@@ -5,7 +5,7 @@ import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { User } from "@supabase/supabase-js"
 import AttendanceBarChart from "@/components/BarChart"
-import { ArrowLeft, Search } from "lucide-react"
+import { ArrowLeft, Search, ChevronDown, ChevronUp } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -35,6 +35,45 @@ interface MonthlyAttendance {
 interface MonthlyReport {
   [key: string]: MonthlyAttendance
 }
+
+const AbsentDatesAccordion = ({ dates }: { dates: string[] }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  if (dates.length === 0) {
+    return <span>No absences</span>;
+  }
+
+  return (
+    <div>
+      {!isOpen ? (
+        <button
+          onClick={() => setIsOpen(true)}
+          className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium"
+        >
+          {dates.length} {dates.length === 1 ? 'date' : 'dates'}
+          <ChevronDown className="w-4 h-4" />
+        </button>
+      ) : (
+        <div>
+          <button
+            onClick={() => setIsOpen(false)}
+            className="flex items-center gap-2 text-blue-600 hover:text-blue-800 font-medium mb-2"
+          >
+            Collapse
+            <ChevronUp className="w-4 h-4" />
+          </button>
+          <ul className="space-y-1">
+            {dates.map((date, index) => (
+              <li key={index} className="text-sm text-gray-600">
+                {date}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+};
 
 export default function Reports() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([])
@@ -310,14 +349,9 @@ export default function Reports() {
                             {data.attendancePercentage.toFixed(2)}%
                           </span>
                         </td>
-                        <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                          <div className="max-w-[150px] sm:max-w-[200px] md:max-w-xs overflow-hidden text-ellipsis">
-                            {data.absentDates.length > 0 ? 
-                              data.absentDates.join(', ') : 
-                              'No absences'
-                            }
-                          </div>
-                        </td>
+                        <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm transition-all duration-200">
+                        <AbsentDatesAccordion dates={data.absentDates} />
+                      </td>
                       </tr>
                     ))}
                     {getFilteredAndSortedReport().length === 0 && (

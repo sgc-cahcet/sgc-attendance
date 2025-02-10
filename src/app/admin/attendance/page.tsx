@@ -1,42 +1,43 @@
 "use client"
 
-import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
-import { Card } from "@/components/ui/card";
-import { Share2, ArrowLeft, Check, X } from "lucide-react";
-import { User } from "@supabase/supabase-js"
+import { useState, useEffect } from "react"
+import { supabase } from "@/lib/supabase"
+import { Card } from "@/components/ui/card"
+import { Share2, ArrowLeft, Check, X } from "lucide-react"
+import type { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
 import Image from "next/image"
 
 type Member = {
-  id: number;
-  name: string;
-  department: string;
-  role: string;
-  academicYear: string;
-};
+  id: number
+  name: string
+  department: string
+  role: string
+  academicYear: string
+}
 
 type GroupedMembers = {
-  [key: string]: Member[];
-};
+  [key: string]: Member[]
+}
 
 export default function DailyAttendance() {
-  const [members, setMembers] = useState<Member[]>([]);
-  const [groupedMembers, setGroupedMembers] = useState<GroupedMembers>({});
-  const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0]);
-  const [attendance, setAttendance] = useState<{ [key: number]: boolean }>({});
-  const [message, setMessage] = useState<string>("");
+  const [members, setMembers] = useState<Member[]>([])
+  const [groupedMembers, setGroupedMembers] = useState<GroupedMembers>({})
+  const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0])
+  const [attendance, setAttendance] = useState<{ [key: number]: boolean }>({})
+  const [message, setMessage] = useState<string>("")
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showToast, setShowToast] = useState(false)
   const router = useRouter()
 
   const yearOrder: { [key: string]: number } = {
-    'IV': 1,
-    'III': 2,
-    'II': 3,
-    'I': 4
-  };
+    IV: 1,
+    III: 2,
+    II: 3,
+    I: 4,
+  }
 
   useEffect(() => {
     checkSession()
@@ -49,112 +50,120 @@ export default function DailyAttendance() {
       } = await supabase.auth.getSession()
 
       if (!session) {
-        router.replace('/admin/login')
+        router.replace("/admin/login")
         return
       }
 
       setUser(session.user)
     } catch (error) {
-      console.error('Error checking session:', error)
-      router.replace('/admin/login')
+      console.error("Error checking session:", error)
+      router.replace("/admin/login")
     } finally {
       setLoading(false)
     }
   }
 
   useEffect(() => {
-    fetchMembers();
-  }, []);
+    fetchMembers()
+  }, [])
 
   useEffect(() => {
-    fetchAttendance();
-  }, [date]);
+    fetchAttendance()
+  }, [members]) //Removed unnecessary dependency: date
 
   useEffect(() => {
-    organizeMembers();
-  }, [members]);
+    organizeMembers()
+  }, [members])
+
+  useEffect(() => {
+    if (showToast) {
+      const timer = setTimeout(() => {
+        setShowToast(false)
+      }, 15000)
+
+      return () => clearTimeout(timer)
+    }
+  }, [showToast])
 
   const fetchMembers = async () => {
-    const { data, error } = await supabase
-      .from("members")
-      .select("*")
-      .order('academicYear', { ascending: false });
-      
-    if (error) console.error("Error fetching members:", error);
-    else setMembers(data || []);
-  };
+    const { data, error } = await supabase.from("members").select("*").order("academicYear", { ascending: false })
+
+    if (error) console.error("Error fetching members:", error)
+    else setMembers(data || [])
+  }
 
   const organizeMembers = () => {
     const grouped = members.reduce((acc: GroupedMembers, member) => {
-      const year = member.academicYear || 'Other';
+      const year = member.academicYear || "Other"
       if (!acc[year]) {
-        acc[year] = [];
+        acc[year] = []
       }
-      acc[year].push(member);
-      return acc;
-    }, {});
+      acc[year].push(member)
+      return acc
+    }, {})
 
-    Object.keys(grouped).forEach(year => {
-      grouped[year].sort((a, b) => a.name.localeCompare(b.name));
-    });
+    Object.keys(grouped).forEach((year) => {
+      grouped[year].sort((a, b) => a.name.localeCompare(b.name))
+    })
 
-    setGroupedMembers(grouped);
-  };
+    setGroupedMembers(grouped)
+  }
 
   const fetchAttendance = async () => {
-    const { data, error } = await supabase
-      .from("attendance")
-      .select("member_id, is_present")
-      .eq("date", date);
+    const { data, error } = await supabase.from("attendance").select("member_id, is_present").eq("date", date)
 
     if (error) {
-      console.error("Error fetching attendance:", error);
+      console.error("Error fetching attendance:", error)
     } else {
-      const fetchedAttendance = data.reduce((acc: { [key: number]: boolean }, record: { member_id: number; is_present: boolean }) => {
-        acc[record.member_id] = record.is_present;
-        return acc;
-      }, {});
-      setAttendance(fetchedAttendance);
+      const fetchedAttendance = data.reduce(
+        (acc: { [key: number]: boolean }, record: { member_id: number; is_present: boolean }) => {
+          acc[record.member_id] = record.is_present
+          return acc
+        },
+        {},
+      )
+      setAttendance(fetchedAttendance)
     }
-  };
+  }
 
   const handleAttendanceChange = (memberId: number, isPresent: boolean) => {
-    setAttendance((prev) => ({ ...prev, [memberId]: isPresent }));
-  };
+    setAttendance((prev) => ({ ...prev, [memberId]: isPresent }))
+  }
 
   const submitAttendance = async () => {
     const attendanceRecords = Object.entries(attendance).map(([memberId, isPresent]) => ({
       member_id: Number(memberId),
       date,
       is_present: isPresent,
-    }));
+    }))
 
-    const { error } = await supabase
-      .from("attendance")
-      .upsert(attendanceRecords, { onConflict: "member_id, date" });
-      
-    if (error) console.error("Error submitting attendance:", error);
+    const { error } = await supabase.from("attendance").upsert(attendanceRecords, { onConflict: "member_id, date" })
+
+    if (error) console.error("Error submitting attendance:", error)
     else {
-      alert(`📅 ${date}'s attendance was updated successfully ✅`);
-      generateMessage();
+      setShowToast(true)
+      generateMessage()
     }
-  };
+  }
 
   const generateMessage = () => {
-    const presentMembers = members.filter((m) => attendance[m.id]);
-    const absentMembers = members.filter((m) => !attendance[m.id]);
-    
-    const formattedMessage = `*Attendance Report - ${date}* \n\n *Present (${presentMembers.length}):* \n${presentMembers.map(m => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Absent (${absentMembers.length}):* \n${absentMembers.map(m => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Stay consistent and keep learning!* `;
-    setMessage(formattedMessage);
-  };
+    const presentMembers = members.filter((m) => attendance[m.id])
+    const absentMembers = members.filter((m) => !attendance[m.id])
+
+    const formattedMessage = `*Attendance Report - ${date}* \n\n *Present (${presentMembers.length}):* \n${presentMembers.map((m) => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Absent (${absentMembers.length}):* \n${absentMembers.map((m) => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Stay consistent and keep learning!* `
+    setMessage(formattedMessage)
+  }
 
   const renderYearCard = (year: string, members: Member[]) => (
-    <Card key={year} className="mb-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow">
+    <Card
+      key={year}
+      className="mb-6 border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[6px_6px_0px_0px_rgba(0,0,0,1)] transition-shadow"
+    >
       <div className="bg-yellow-100 border-b-2 border-black p-4 rounded-t-md">
         <h3 className="text-xl font-bold">{year} Year Students</h3>
         <p className="text-sm text-gray-600 mt-1">{members.length} members</p>
       </div>
-      
+
       <div className="p-4">
         <div className="overflow-x-auto">
           <table className="w-full">
@@ -166,35 +175,35 @@ export default function DailyAttendance() {
             </thead>
             <tbody>
               {members.map((member, index) => (
-                <tr 
+                <tr
                   key={member.id}
-                  className={`hover:bg-gray-50 ${index !== members.length - 1 ? 'border-b border-gray-200' : ''}`}
+                  className={`hover:bg-gray-50 ${index !== members.length - 1 ? "border-b border-gray-200" : ""}`}
                 >
                   <td className="px-4 py-3">
                     <p className="font-medium">{member.name}</p>
                   </td>
                   <td className="px-4 py-2">
                     <div className="flex justify-center gap-2">
-                    <button
-                    onClick={() => handleAttendanceChange(member.id, true)}
-                    className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
-                    attendance[member.id] 
-                     ? "bg-green-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]" 
-                    : "bg-gray-100 hover:bg-green-100"
-                   }`}
-                >
-                <Check className="w-5 h-5" />
-                </button>
-                <button
-                  onClick={() => handleAttendanceChange(member.id, false)}
-                  className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
-                    attendance[member.id] === false 
-                      ? "bg-red-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]" 
-                      : "bg-gray-100 hover:bg-red-100"
-                  }`}
-                >
-                  <X className="w-5 h-5" />
-                </button>
+                      <button
+                        onClick={() => handleAttendanceChange(member.id, true)}
+                        className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
+                          attendance[member.id]
+                            ? "bg-green-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]"
+                            : "bg-gray-100 hover:bg-green-100"
+                        }`}
+                      >
+                        <Check className="w-5 h-5" />
+                      </button>
+                      <button
+                        onClick={() => handleAttendanceChange(member.id, false)}
+                        className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
+                          attendance[member.id] === false
+                            ? "bg-red-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]"
+                            : "bg-gray-100 hover:bg-red-100"
+                        }`}
+                      >
+                        <X className="w-5 h-5" />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -204,32 +213,37 @@ export default function DailyAttendance() {
         </div>
       </div>
     </Card>
-  );
+  )
 
   return (
     <div className="min-h-screen bg-[#f0f0f0] p-4 md:p-8">
-      <Link 
-        href="/admin/dashboard" 
+      {showToast && (
+        <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
+          <div className="bg-green-500 text-white px-4 py-2 rounded-md shadow-md flex items-center justify-between">
+            <span>📅 {date}&apos;s attendance was updated successfully ✅</span>
+            <button onClick={() => setShowToast(false)} className="ml-2 text-white hover:text-gray-200">
+              <X className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      )}
+      <Link
+        href="/admin/dashboard"
         className="inline-flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-6 group"
       >
         <ArrowLeft className="w-4 h-4 transition-transform group-hover:-translate-x-1" />
         <span className="text-sm font-medium">Back to Dashboard</span>
       </Link>
-      
+
       <div className="flex items-center justify-center mb-6">
-        <Image
-          src="/logo.png"
-          alt="SGC Logo"
-          width={100}
-          height={100}
-        />
+        <Image src="/logo.png" alt="SGC Logo" width={100} height={100} />
       </div>
 
       <div className="max-w-4xl mx-auto">
         <Card className="mb-6 bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] md:shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
           <div className="p-4 md:p-6">
             <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-6">Daily Attendance</h1>
-            
+
             <input
               type="date"
               value={date}
@@ -246,8 +260,8 @@ export default function DailyAttendance() {
         </div>
 
         <div className="mt-6 space-y-6">
-          <button 
-            onClick={submitAttendance} 
+          <button
+            onClick={submitAttendance}
             className="w-full px-6 py-4 bg-blue-500 text-white font-bold rounded-md border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
           >
             Submit Attendance
@@ -273,5 +287,5 @@ export default function DailyAttendance() {
         </div>
       </div>
     </div>
-  );
+  )
 }

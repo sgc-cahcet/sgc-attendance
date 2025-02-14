@@ -179,48 +179,58 @@ export default function FeedbackManagement() {
         </div>
 
         {/* Mobile View - Card Layout */}
-        <div className="md:hidden space-y-4">
-          {filteredFeedbacks.map((feedback) => (
-            <div key={feedback.id} className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
-              <div className="flex justify-between items-start mb-4">
-                <div>
-                  <h3 className="font-semibold text-lg">{feedback.name}</h3>
-                  <p className="text-gray-600">{feedback.email}</p>
+          <div className="md:hidden space-y-4">
+            {filteredFeedbacks.map((feedback) => (
+              <div key={feedback.id} className="bg-white border-2 border-black p-4 shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
+                {/* Header with Name, Email, and Actions */}
+                <div className="flex justify-between items-start mb-4">
+                  <div className="max-w-[60%]"> {/* Limit width of name/email section */}
+                    <h3 className="font-semibold text-lg truncate">{feedback.name}</h3>
+                    <p className="text-gray-600 text-sm truncate">{feedback.email}</p>
+                  </div>
+                  
+                  {/* Status and Delete - Always in top right */}
+                  <div className="flex flex-col gap-2 min-w-[120px]">
+                    <select
+                      value={feedback.status}
+                      onChange={(e) => updateFeedbackStatus(feedback.id, e.target.value)}
+                      className={`w-full px-2 py-1 border rounded font-medium text-sm ${
+                        statusColors[feedback.status as keyof typeof statusColors]
+                      }`}
+                    >
+                      {statusOptions.map(status => (
+                        <option key={status} value={status}>
+                          {status.charAt(0).toUpperCase() + status.slice(1)}
+                        </option>
+                      ))}
+                    </select>
+                    <button
+                      onClick={() => setDeleteConfirm(feedback.id)}
+                      className="w-full flex items-center justify-center px-2 py-1 text-red-600 hover:bg-red-50 border border-red-200 rounded transition-colors"
+                    >
+                      <Trash2 className="w-4 h-4 mr-1" />
+                      <span className="text-sm">Delete</span>
+                    </button>
+                  </div>
                 </div>
-                <div className="flex items-center space-x-3">
-                  <select
-                    value={feedback.status}
-                    onChange={(e) => updateFeedbackStatus(feedback.id, e.target.value)}
-                    className={`px-3 py-1.5 border rounded font-medium ${statusColors[feedback.status as keyof typeof statusColors]}`}
-                  >
-                    {statusOptions.map(status => (
-                      <option key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </option>
-                    ))}
-                  </select>
-                  <button
-                    onClick={() => setDeleteConfirm(feedback.id)}
-                    className="p-2 text-red-600 hover:bg-red-50 border border-red-200 rounded transition-colors"
-                  >
-                    <Trash2 className="w-5 h-5" />
-                  </button>
-                </div>
-              </div>
-              <div className="space-y-3">
-                <div>
-                  <span className="inline-block px-3 py-1 bg-gray-100 border border-gray-200 text-gray-800 font-medium">
+
+                {/* Type and Date */}
+                <div className="flex flex-wrap gap-2 mb-3">
+                  <span className="inline-block px-3 py-1 bg-gray-100 border border-gray-200 text-gray-800 font-medium text-sm">
                     {feedback.feedback_type}
                   </span>
+                  <span className="text-sm text-gray-500 font-medium">
+                    {formatDate(feedback.created_at)} at {formatTime(feedback.created_at)}
+                  </span>
                 </div>
-                <p className="text-gray-800 border-l-4 border-gray-200 pl-3">{feedback.message}</p>
-                <p className="text-sm text-gray-500 font-medium">
-                  {formatDate(feedback.created_at)} at {formatTime(feedback.created_at)}
+
+                {/* Message */}
+                <p className="text-gray-800 border-l-4 border-gray-200 pl-3 text-sm">
+                  {feedback.message}
                 </p>
               </div>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
 
         {/* Desktop View - Table Layout */}
         <div className="hidden md:block bg-white border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">

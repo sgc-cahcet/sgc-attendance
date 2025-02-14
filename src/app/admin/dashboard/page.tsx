@@ -4,7 +4,7 @@ import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import Link from "next/link"
 import { Card } from "@/components/ui/card"
-import { LogOut, Users, CalendarCheck, BarChart3 } from "lucide-react"
+import { LogOut, Users, CalendarCheck, BarChart3, MessageSquareQuote } from "lucide-react"
 import { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -92,17 +92,8 @@ export default function AdminDashboard() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-8">
-        <Link href="/admin/members" className="block">
-          <Card className="p-4 sm:p-6 bg-yellow-100 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
-            <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-4">
-              <Users className="h-6 w-6 sm:h-8 sm:w-8" />
-              <h3 className="text-xl sm:text-2xl font-bold">Manage Members</h3>
-            </div>
-            <p className="text-base sm:text-lg">Add, remove, or edit member information</p>
-          </Card>
-        </Link>
 
-        <Link href="/admin/attendance" className="block">
+      <Link href="/admin/attendance" className="block">
           <Card className="p-4 sm:p-6 bg-blue-100 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
             <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-4">
               <CalendarCheck className="h-6 w-6 sm:h-8 sm:w-8" />
@@ -112,6 +103,7 @@ export default function AdminDashboard() {
           </Card>
         </Link>
 
+
         <Link href="/admin/reports" className="block">
           <Card className="p-4 sm:p-6 bg-green-100 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
             <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-4">
@@ -119,6 +111,26 @@ export default function AdminDashboard() {
               <h3 className="text-xl sm:text-2xl font-bold">Reports</h3>
             </div>
             <p className="text-base sm:text-lg">View attendance reports and statistics</p>
+          </Card>
+        </Link>
+
+        <Link href="/admin/members" className="block">
+          <Card className="p-4 sm:p-6 bg-yellow-100 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
+            <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-4">
+              <Users className="h-6 w-6 sm:h-8 sm:w-8" />
+              <h3 className="text-xl sm:text-2xl font-bold">Manage Members</h3>
+            </div>
+            <p className="text-base sm:text-lg">Add, remove, or edit member information</p>
+          </Card>
+        </Link>
+        
+        <Link href="/admin/feedback" className="block">
+          <Card className="p-4 sm:p-6 bg-red-100 border-2 border-black shadow-[8px_8px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] transition-all">
+            <div className="flex items-center gap-3 sm:gap-4 mb-2 sm:mb-4">
+              <MessageSquareQuote className="h-6 w-6 sm:h-8 sm:w-8" />
+              <h3 className="text-xl sm:text-2xl font-bold">Feedbacks</h3>
+            </div>
+            <p className="text-base sm:text-lg">View & Manage the Feedbacks from SGC Website</p>
           </Card>
         </Link>
       </div>

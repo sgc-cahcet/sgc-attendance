@@ -18,6 +18,7 @@ interface Member {
 interface AttendanceRecord {
   is_present: boolean
   date: string
+  member_id: string
   members: Member
 }
 
@@ -40,7 +41,7 @@ const AbsentDatesAccordion = ({ dates }: { dates: string[] }) => {
   const [isOpen, setIsOpen] = useState(false);
 
   if (dates.length === 0) {
-    return <span>No absences</span>;
+    return <span className="text-green-600 font-medium">No absences</span>;
   }
 
   return (
@@ -77,6 +78,7 @@ const AbsentDatesAccordion = ({ dates }: { dates: string[] }) => {
 
 export default function Reports() {
   const [attendanceData, setAttendanceData] = useState<AttendanceRecord[]>([])
+  const [allMembers, setAllMembers] = useState<Member[]>([])
   const [chartData, setChartData] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
@@ -117,6 +119,18 @@ export default function Reports() {
   }
 
   const fetchAttendanceData = async () => {
+    // Fetch all members
+    const { data: membersData, error: membersError } = await supabase
+      .from("members")
+      .select("name, department, role")
+    
+    if (membersError) {
+      console.error("Error fetching members:", membersError)
+    } else {
+      setAllMembers(membersData || [])
+    }
+
+    // Fetch attendance data
     const { data, error } = await supabase
       .from("attendance")
       .select(`
@@ -144,6 +158,25 @@ export default function Reports() {
     setSelectedMonth(sortedMonths[sortedMonths.length - 1] || "")
   }
 
+  // Get all working days (excluding weekends) in a month
+  const getWorkingDaysInMonth = (year: number, month: number) => {
+    const workingDays: string[] = []
+    const daysInMonth = new Date(year, month + 1, 0).getDate()
+    
+    for (let day = 1; day <= daysInMonth; day++) {
+      const date = new Date(year, month, day)
+      const dayOfWeek = date.getDay()
+      
+      // Skip Saturdays (6) and Sundays (0)
+      if (dayOfWeek !== 0 && dayOfWeek !== 6) {
+        const dateString = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+        workingDays.push(dateString)
+      }
+    }
+    
+    return workingDays
+  }
+
   const processChartData = (data: AttendanceRecord[]) => {
     if (!selectedMonth) return
 
@@ -153,26 +186,28 @@ export default function Reports() {
       return recordMonth === selectedMonth
     })
 
-    const memberAttendance: { [key: string]: { present: number; absent: number } } = {}
+    // Get all unique dates that have attendance entries (these are the working days)
+    const workingDaysInMonth = Array.from(new Set(filteredData.map(record => record.date)))
+
+    // Group by member
+    const memberAttendance: { [key: string]: Set<string> } = {}
 
     filteredData.forEach((record) => {
       const memberName = record.members.name
       if (!memberAttendance[memberName]) {
-        memberAttendance[memberName] = { present: 0, absent: 0 }
+        memberAttendance[memberName] = new Set()
       }
       if (record.is_present) {
-        memberAttendance[memberName].present++
-      } else {
-        memberAttendance[memberName].absent++
+        memberAttendance[memberName].add(record.date)
       }
     })
 
     const processedData = Object.entries(memberAttendance)
       .sort(([nameA], [nameB]) => nameA.localeCompare(nameB))
-      .map(([name, record]) => ({
+      .map(([name, presentDates]) => ({
         name,
-        present: record.present,
-        absent: record.absent
+        present: presentDates.size,
+        absent: workingDaysInMonth.length - presentDates.size
       }))
 
     setChartData(processedData)
@@ -187,39 +222,73 @@ export default function Reports() {
       return recordMonth === selectedMonth
     })
 
-    const workingDays = new Set(monthlyRecords.map(record => record.date)).size
+    // Get all unique dates that have attendance entries (these are the working days)
+    const workingDaysInMonth = Array.from(new Set(monthlyRecords.map(record => record.date))).sort()
+    const totalWorkingDays = workingDaysInMonth.length
 
     const report: MonthlyReport = {}
 
+    // Initialize report with ALL members (even those without attendance records)
+    allMembers.forEach(member => {
+      report[member.name] = {
+        name: member.name,
+        department: member.department,
+        role: member.role,
+        workingDays: totalWorkingDays,
+        present: 0,
+        absent: totalWorkingDays,
+        attendancePercentage: 0,
+        absentDates: workingDaysInMonth.map(date => {
+          const d = new Date(date)
+          return d.toLocaleDateString('en-US', { 
+            year: 'numeric', 
+            month: 'short', 
+            day: 'numeric' 
+          })
+        })
+      }
+    })
+
+    // Update with actual attendance data for members who have records
     const uniqueMembers = new Set(monthlyRecords.map(record => record.members.name))
+    
     uniqueMembers.forEach(memberName => {
       const memberRecord = monthlyRecords.find(record => record.members.name === memberName)
-      if (memberRecord) {
+      if (memberRecord && report[memberName]) {
+        // Get all present dates for this member
+        const presentDates = new Set(
+          monthlyRecords
+            .filter(record => record.members.name === memberName && record.is_present)
+            .map(record => record.date)
+        )
+
+        // Calculate absent dates (working days not in present dates)
+        const absentDates = workingDaysInMonth
+          .filter(date => !presentDates.has(date))
+          .map(date => {
+            const d = new Date(date)
+            return d.toLocaleDateString('en-US', { 
+              year: 'numeric', 
+              month: 'short', 
+              day: 'numeric' 
+            })
+          })
+
+        const presentCount = presentDates.size
+        const absentCount = totalWorkingDays - presentCount
+        const attendancePercentage = totalWorkingDays > 0 ? (presentCount / totalWorkingDays) * 100 : 0
+
         report[memberName] = {
           name: memberName,
           department: memberRecord.members.department,
           role: memberRecord.members.role,
-          workingDays: workingDays,
-          present: 0,
-          absent: 0,
-          attendancePercentage: 0,
-          absentDates: []
+          workingDays: totalWorkingDays,
+          present: presentCount,
+          absent: absentCount,
+          attendancePercentage: attendancePercentage,
+          absentDates: absentDates
         }
       }
-    })
-
-    monthlyRecords.forEach(record => {
-      const memberName = record.members.name
-      if (record.is_present) {
-        report[memberName].present++
-      } else {
-        report[memberName].absent++
-        report[memberName].absentDates.push(new Date(record.date).toLocaleDateString())
-      }
-    })
-
-    Object.values(report).forEach(record => {
-      record.attendancePercentage = (record.present / workingDays) * 100
     })
 
     return report
@@ -341,17 +410,27 @@ export default function Reports() {
                         <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-xs sm:text-sm">{data.present}</td>
                         <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-xs sm:text-sm">{data.absent}</td>
                         <td className="whitespace-nowrap px-2 sm:px-4 py-3 text-xs sm:text-sm">
-                          <span className={`font-medium px-2 py-1 rounded-md border-2 border-black ${
-                            data.attendancePercentage < 75 
-                              ? 'bg-red-100 text-red-700' 
-                              : 'bg-green-100 text-green-700'
-                          }`}>
-                            {data.attendancePercentage.toFixed(2)}%
-                          </span>
+                          {data.present === 0 ? (
+                            <span className="font-medium px-2 py-1 rounded-md border-2 border-black bg-gray-100 text-gray-600">
+                              No Records
+                            </span>
+                          ) : (
+                            <span className={`font-medium px-2 py-1 rounded-md border-2 border-black ${
+                              data.attendancePercentage < 75 
+                                ? 'bg-red-100 text-red-700' 
+                                : 'bg-green-100 text-green-700'
+                            }`}>
+                              {data.attendancePercentage.toFixed(2)}%
+                            </span>
+                          )}
                         </td>
                         <td className="px-2 sm:px-4 py-3 text-xs sm:text-sm transition-all duration-200">
-                        <AbsentDatesAccordion dates={data.absentDates} />
-                      </td>
+                          {data.present === 0 ? (
+                            <span className="text-gray-500 italic">No attendance recorded</span>
+                          ) : (
+                            <AbsentDatesAccordion dates={data.absentDates} />
+                          )}
+                        </td>
                       </tr>
                     ))}
                     {getFilteredAndSortedReport().length === 0 && (

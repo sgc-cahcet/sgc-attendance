@@ -171,7 +171,7 @@ export default function MemberManagement() {
   }
 
   const academicYears = ["I", "II", "III", "IV"]
-  const roles = ["Trainee", "Member", "Advisor", "Vice President", "President"]
+  const roles = ["Trainee", "Member", "Advisor", "Vice President", "President", "Session Incharge", "Administrator"]
 
   if (loading) {
     return (

@@ -12,7 +12,7 @@ export default function AdminLogin() {
   const [error, setError] = useState("")
   const router = useRouter()
 
-  // Check for active session on component mount
+  // ✅ Check for active session on component mount
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession()
@@ -23,18 +23,44 @@ export default function AdminLogin() {
     checkSession()
   }, [router])
 
+  // ✅ Login handler with role verification
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError("")
     setLoading(true)
-    
+
     try {
+      // Step 1: Sign in
       const { data, error } = await supabase.auth.signInWithPassword({
         email,
         password,
       })
       if (error) throw error
+
+      const user = data.user
+      if (!user) throw new Error("User not found")
+
+      // Step 2: Check role from members table
+      const { data: memberData, error: memberError } = await supabase
+        .from("members")
+        .select("role")
+        .eq("email", email)
+        .single()
+
+      if (memberError) throw memberError
+      if (!memberData) throw new Error("Member record not found")
+
+      const allowedRoles = ["President", "Vice President", "Administrator"]
+
+      if (!allowedRoles.includes(memberData.role)) {
+        // Not authorized → sign out
+        await supabase.auth.signOut()
+        throw new Error("Unauthorized access. Only Board Members and Administrator can log in.")
+      }
+
+      // ✅ Authorized → redirect to dashboard
       router.push("/admin/dashboard")
+
     } catch (error: any) {
       setError(error.message || "Error logging in")
     } finally {
@@ -45,18 +71,19 @@ export default function AdminLogin() {
   return (
     <div className="min-h-screen bg-[#f0f0f0] flex flex-col items-center justify-center p-4">
       <main className="w-full max-w-md bg-white border-2 border-black rounded-lg p-8 shadow-[8px_8px_0px_0px_rgba(0,0,0,1)]">
-      <div className="flex items-center justify-center">
-        <Image
-          src="/logo.png"
-          alt="SGC Logo"
-          width={100}
-          height={100}
-        />
-      </div>
+        <div className="flex items-center justify-center">
+          <Image
+            src="/logo.png"
+            alt="SGC Logo"
+            width={100}
+            height={100}
+          />
+        </div>
+
         <h1 className="text-4xl font-black mb-8 text-center tracking-tight">
           Admin Login
         </h1>
-        
+
         {error && (
           <div className="mb-6 p-4 bg-red-100 border-2 border-black text-black rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]">
             {error}
@@ -74,7 +101,7 @@ export default function AdminLogin() {
               placeholder="Enter your email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-4 py-3 border-2 border-black rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] 
+              className="w-full px-4 py-3 border-2 border-black rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]
                 focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] focus:translate-x-[2px] focus:translate-y-[2px]
                 transition-all"
               required
@@ -112,10 +139,11 @@ export default function AdminLogin() {
           </button>
         </form>
       </main>
+
       <div className="mt-8 text-center text-gray-500 text-xs">
         <p>This Site was Developed and Maintained by SGC</p>
-          <p>&copy; {new Date().getFullYear()} Students Guidance Cell - CAHCET. All Rights Reserved</p>
-        </div>
+        <p>&copy; {new Date().getFullYear()} Students Guidance Cell - CAHCET. All Rights Reserved</p>
+      </div>
     </div>
   )
 }

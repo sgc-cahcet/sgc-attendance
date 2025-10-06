@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react"
 import { supabase } from "@/lib/supabase"
 import { Card } from "@/components/ui/card"
-import { Share2, ArrowLeft, Check, X } from "lucide-react"
+import { Share2, ArrowLeft, Check, X, RefreshCw } from "lucide-react"
 import type { User } from "@supabase/supabase-js"
 import { useRouter } from "next/navigation"
 import Link from "next/link"
@@ -25,11 +25,15 @@ export default function DailyAttendance() {
   const [members, setMembers] = useState<Member[]>([])
   const [groupedMembers, setGroupedMembers] = useState<GroupedMembers>({})
   const [date, setDate] = useState<string>(new Date().toISOString().split("T")[0])
-  const [attendance, setAttendance] = useState<{ [key: number]: boolean }>({})
+  const [attendance, setAttendance] = useState<{ [key: number]: boolean | undefined }>({})
+  const [originalAttendance, setOriginalAttendance] = useState<{ [key: number]: boolean | undefined }>({})
+  const [changedAttendance, setChangedAttendance] = useState<Set<number>>(new Set())
   const [message, setMessage] = useState<string>("")
   const [user, setUser] = useState<User | null>(null)
   const [loading, setLoading] = useState(true)
+  const [fetchingAttendance, setFetchingAttendance] = useState(false)
   const [showToast, setShowToast] = useState(false)
+  const [toastMessage, setToastMessage] = useState("")
   const router = useRouter()
 
   const yearOrder: { [key: string]: number } = {
@@ -68,8 +72,10 @@ export default function DailyAttendance() {
   }, [])
 
   useEffect(() => {
-    fetchAttendance()
-  }, [members]) //Removed unnecessary dependency: date
+    if (members.length > 0) {
+      fetchAttendance()
+    }
+  }, [date, members])
 
   useEffect(() => {
     organizeMembers()
@@ -79,7 +85,7 @@ export default function DailyAttendance() {
     if (showToast) {
       const timer = setTimeout(() => {
         setShowToast(false)
-      }, 15000)
+      }, 3000)
 
       return () => clearTimeout(timer)
     }
@@ -110,10 +116,12 @@ export default function DailyAttendance() {
   }
 
   const fetchAttendance = async () => {
+    setFetchingAttendance(true)
     const { data, error } = await supabase.from("attendance").select("member_id, is_present").eq("date", date)
 
     if (error) {
       console.error("Error fetching attendance:", error)
+      setFetchingAttendance(false)
     } else {
       const fetchedAttendance = data.reduce(
         (acc: { [key: number]: boolean }, record: { member_id: number; is_present: boolean }) => {
@@ -123,35 +131,76 @@ export default function DailyAttendance() {
         {},
       )
       setAttendance(fetchedAttendance)
+      setOriginalAttendance(fetchedAttendance)
+      setChangedAttendance(new Set())
+      setMessage("")
+      setFetchingAttendance(false)
     }
   }
 
   const handleAttendanceChange = (memberId: number, isPresent: boolean) => {
-    setAttendance((prev) => ({ ...prev, [memberId]: isPresent }))
+    setAttendance((prev) => {
+      const newAttendance = { ...prev, [memberId]: isPresent }
+      
+      // Track if this changed from original
+      const originalValue = originalAttendance[memberId]
+      setChangedAttendance((prevChanged) => {
+        const newChanged = new Set(prevChanged)
+        if (originalValue !== isPresent) {
+          newChanged.add(memberId)
+        } else {
+          newChanged.delete(memberId)
+        }
+        return newChanged
+      })
+      
+      return newAttendance
+    })
   }
 
   const submitAttendance = async () => {
-    const attendanceRecords = Object.entries(attendance).map(([memberId, isPresent]) => ({
-      member_id: Number(memberId),
-      date,
-      is_present: isPresent,
-    }))
+    // Only submit changed attendance records
+    const changedRecords = Array.from(changedAttendance)
+      .filter(memberId => attendance[memberId] !== undefined)
+      .map((memberId) => ({
+        member_id: memberId,
+        date,
+        is_present: attendance[memberId] as boolean,
+      }))
 
-    const { error } = await supabase.from("attendance").upsert(attendanceRecords, { onConflict: "member_id, date" })
+    if (changedRecords.length === 0) {
+      setToastMessage("⚠️ No changes to submit")
+      setShowToast(true)
+      return
+    }
 
-    if (error) console.error("Error submitting attendance:", error)
-    else {
+    const { error } = await supabase.from("attendance").upsert(changedRecords, { onConflict: "member_id, date" })
+
+    if (error) {
+      console.error("Error submitting attendance:", error)
+      setToastMessage("❌ Error updating attendance")
+      setShowToast(true)
+    } else {
+      // Update original attendance to current state
+      setOriginalAttendance({ ...attendance })
+      setChangedAttendance(new Set())
+      setToastMessage(`✅ Updated attendance for ${changedRecords.length} member(s) on ${date}`)
       setShowToast(true)
       generateMessage()
     }
   }
 
   const generateMessage = () => {
-    const presentMembers = members.filter((m) => attendance[m.id])
-    const absentMembers = members.filter((m) => !attendance[m.id])
+    const presentMembers = members.filter((m) => attendance[m.id] === true)
+    const absentMembers = members.filter((m) => attendance[m.id] === false)
 
     const formattedMessage = `*Attendance Report - ${date}* \n\n *Present (${presentMembers.length}):* \n${presentMembers.map((m) => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Absent (${absentMembers.length}):* \n${absentMembers.map((m) => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Stay consistent and keep learning!* `
     setMessage(formattedMessage)
+  }
+
+  const handleDateChange = (newDate: string) => {
+    setDate(newDate)
+    setMessage("")
   }
 
   const renderYearCard = (year: string, members: Member[]) => (
@@ -174,40 +223,46 @@ export default function DailyAttendance() {
               </tr>
             </thead>
             <tbody>
-              {members.map((member, index) => (
-                <tr
-                  key={member.id}
-                  className={`hover:bg-gray-50 ${index !== members.length - 1 ? "border-b border-gray-200" : ""}`}
-                >
-                  <td className="px-4 py-3">
-                    <p className="font-medium">{member.name}</p>
-                  </td>
-                  <td className="px-4 py-2">
-                    <div className="flex justify-center gap-2">
-                      <button
-                        onClick={() => handleAttendanceChange(member.id, true)}
-                        className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
-                          attendance[member.id]
-                            ? "bg-green-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]"
-                            : "bg-gray-100 hover:bg-green-100"
-                        }`}
-                      >
-                        <Check className="w-5 h-5" />
-                      </button>
-                      <button
-                        onClick={() => handleAttendanceChange(member.id, false)}
-                        className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
-                          attendance[member.id] === false
-                            ? "bg-red-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]"
-                            : "bg-gray-100 hover:bg-red-100"
-                        }`}
-                      >
-                        <X className="w-5 h-5" />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
+              {members.map((member, index) => {
+                const hasChanged = changedAttendance.has(member.id)
+                return (
+                  <tr
+                    key={member.id}
+                    className={`hover:bg-gray-50 ${index !== members.length - 1 ? "border-b border-gray-200" : ""} ${hasChanged ? "bg-blue-50" : ""}`}
+                  >
+                    <td className="px-4 py-3">
+                      <p className="font-medium flex items-center gap-2">
+                        {member.name}
+                        {hasChanged && <span className="text-xs text-blue-600 font-bold">●</span>}
+                      </p>
+                    </td>
+                    <td className="px-4 py-2">
+                      <div className="flex justify-center gap-2">
+                        <button
+                          onClick={() => handleAttendanceChange(member.id, true)}
+                          className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
+                            attendance[member.id] === true
+                              ? "bg-green-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]"
+                              : "bg-gray-100 hover:bg-green-100"
+                          }`}
+                        >
+                          <Check className="w-5 h-5" />
+                        </button>
+                        <button
+                          onClick={() => handleAttendanceChange(member.id, false)}
+                          className={`w-10 h-10 flex items-center justify-center rounded-md border-2 border-black transition-all ${
+                            attendance[member.id] === false
+                              ? "bg-red-400 shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:shadow-[1px_1px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[1px] hover:translate-y-[1px]"
+                              : "bg-gray-100 hover:bg-red-100"
+                          }`}
+                        >
+                          <X className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -220,7 +275,7 @@ export default function DailyAttendance() {
       {showToast && (
         <div className="fixed top-4 left-1/2 transform -translate-x-1/2 z-50">
           <div className="bg-green-500 text-white px-4 py-2 rounded-md shadow-md flex items-center justify-between">
-            <span>📅 {date}&apos;s attendance was updated successfully ✅</span>
+            <span>{toastMessage}</span>
             <button onClick={() => setShowToast(false)} className="ml-2 text-white hover:text-gray-200">
               <X className="w-4 h-4" />
             </button>
@@ -244,27 +299,54 @@ export default function DailyAttendance() {
           <div className="p-4 md:p-6">
             <h1 className="text-3xl md:text-4xl font-black tracking-tight mb-6">Daily Attendance</h1>
 
-            <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="w-full px-4 py-3 text-lg border-2 border-black rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-shadow"
-            />
+            <div className="flex gap-2">
+              <input
+                type="date"
+                value={date}
+                onChange={(e) => handleDateChange(e.target.value)}
+                className="flex-1 px-4 py-3 text-lg border-2 border-black rounded-md shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] focus:outline-none focus:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] transition-shadow"
+              />
+              <button
+                onClick={fetchAttendance}
+                disabled={fetchingAttendance}
+                className="px-4 py-3 bg-purple-500 text-white font-bold rounded-md border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
+              >
+                <RefreshCw className={`w-5 h-5 ${fetchingAttendance ? "animate-spin" : ""}`} />
+                {fetchingAttendance ? "Loading..." : "Fetch"}
+              </button>
+            </div>
+
+            {changedAttendance.size > 0 && (
+              <div className="mt-4 p-3 bg-blue-100 border-2 border-blue-500 rounded-md">
+                <p className="text-sm font-medium text-blue-900">
+                  📝 {changedAttendance.size} unsaved change(s)
+                </p>
+              </div>
+            )}
           </div>
         </Card>
 
-        <div className="space-y-6">
-          {Object.entries(groupedMembers)
-            .sort(([yearA], [yearB]) => (yearOrder[yearA] || 999) - (yearOrder[yearB] || 999))
-            .map(([year, yearMembers]) => renderYearCard(year, yearMembers))}
-        </div>
+        {fetchingAttendance ? (
+          <div className="flex items-center justify-center py-12">
+            <RefreshCw className="w-8 h-8 animate-spin text-gray-600" />
+          </div>
+        ) : (
+          <div className="space-y-6">
+            {Object.entries(groupedMembers)
+              .sort(([yearA], [yearB]) => (yearOrder[yearA] || 999) - (yearOrder[yearB] || 999))
+              .map(([year, yearMembers]) => renderYearCard(year, yearMembers))}
+          </div>
+        )}
 
         <div className="mt-6 space-y-6">
           <button
             onClick={submitAttendance}
-            className="w-full px-6 py-4 bg-blue-500 text-white font-bold rounded-md border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all"
+            disabled={changedAttendance.size === 0}
+            className="w-full px-6 py-4 bg-blue-500 text-white font-bold rounded-md border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:shadow-[2px_2px_0px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Submit Attendance
+            {changedAttendance.size > 0 
+              ? `Submit ${changedAttendance.size} Change(s)` 
+              : "No Changes to Submit"}
           </button>
 
           {message && (

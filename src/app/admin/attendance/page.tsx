@@ -191,10 +191,10 @@ export default function DailyAttendance() {
   }
 
   const generateMessage = () => {
-    // Filter for present members (explicitly marked as true)
+    // Present: Only members explicitly marked as true
     const presentMembers = members.filter((m) => attendance[m.id] === true)
     
-    // Filter for absent members (explicitly marked as false OR not marked at all)
+    // Absent: Members marked as false OR not marked at all (undefined)
     const absentMembers = members.filter((m) => attendance[m.id] === false || attendance[m.id] === undefined)
 
     const formattedMessage = `*Attendance Report - ${date}* \n\n *Present (${presentMembers.length}):* \n${presentMembers.map((m) => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Absent (${absentMembers.length}):* \n${absentMembers.map((m) => `- ${m.name} (${m.academicYear} Year)`).join("\n") || "None"}\n\n *Stay consistent and keep learning!* `

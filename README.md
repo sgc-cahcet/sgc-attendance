@@ -24,7 +24,7 @@
   </p>
 </div>
 
-A comprehensive attendance and session management system built for the **Students Guidance Cell (SGC)** at **CAHCET**. Manage members, track attendance, handle session feedback, and generate reports — all with a clean, admin-friendly interface.
+**This application is intended exclusively for Session Incharge, Administrator, President and Vice President roles. For the purpose of transparency and community collaboration, we have open-sourced this application.** 🚀
 
 > 📖 Explore the [full documentation](docs/) for architecture, setup, database schema, and deployment details.
 
@@ -79,58 +79,25 @@ supabase/
 └── queries-and-rls.sql       # Database schema & RLS policies
 ```
 
-## Getting Started
+## 📖 Documentation
 
-### Prerequisites
+| What | Where |
+|---|---|
+| 🛠️ Setup & configuration | [docs/setup.md](./docs/setup.md) |
+| 🏗️ Architecture & database | [docs/architecture.md](./docs/architecture.md) |
+| 🚀 Cloudflare deployment | [docs/deployment.md](./docs/deployment.md) |
+| 🤝 Contributing guide | [CONTRIBUTING.md](./CONTRIBUTING.md) |
+| 📜 Code of conduct | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md) |
 
-- Node.js ^18.18.0
-- pnpm
-- A Supabase project
+---
 
-### Environment Variables
-
-Create a `.env.local` file in the project root:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-```
-
-### Installation
+## 🚀 Quick Start
 
 ```bash
-pnpm install
-pnpm dev
+npm install
+cp .env.example .env.local   # drop in your Supabase credentials
+npm run dev                   # 🎉 open http://localhost:3000
 ```
-
-Open [http://localhost:3000](http://localhost:3000).
-
-### Database Setup
-
-Run the SQL in [`supabase/queries-and-rls.sql`](supabase/queries-and-rls.sql) against your Supabase project's SQL Editor. This creates all tables, indexes, functions, and RLS policies.
-
-## Deployment
-
-This project is designed for **Cloudflare Pages** via the Next.js integration.
-
-1. Push to GitHub
-2. Connect your repository in Cloudflare Pages
-3. Set build command: `pnpm install && pnpm build`
-4. Set build output: `.next`
-5. Add the three environment variables in Cloudflare dashboard
-6. Deploy
-
-> All API routes use the Edge runtime for Cloudflare compatibility.
-
-## Documentation
-
-Detailed documentation is available in the [`docs/`](docs/) directory:
-
-- [Architecture & Data Flow](docs/architecture.md)
-- [Setup Guide](docs/setup.md)
-- [Database Schema & RLS](docs/database.md)
-- [Deployment Guide](docs/deployment.md)
 
 ## License
 

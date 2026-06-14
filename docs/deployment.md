@@ -50,7 +50,7 @@ Click **Save and Deploy**. The first deployment will take a few minutes.
 
 1. Go to your Pages project → **Custom domains**
 2. Click **Set up a custom domain**
-3. Enter `manage.team.sgc`
+3. Enter `manage.teamsgc.in`
 4. Follow Cloudflare's DNS configuration instructions
 
 ## Environment Variables Reference
@@ -74,8 +74,8 @@ Click **Save and Deploy**. The first deployment will take a few minutes.
 
 After deployment, verify:
 
-- [ ] `https://manage.team.sgc` loads the public landing page
-- [ ] `https://manage.team.sgc/admin/login` shows the login form
+- [ ] `https://manage.teamsgc.in` loads the public landing page
+- [ ] `https://manage.teamsgc.in/admin/login` shows the login form
 - [ ] Login works with admin credentials
 - [ ] Dashboard, attendance, reports, members, feedback pages all load
 - [ ] Member self-service works at `/member`

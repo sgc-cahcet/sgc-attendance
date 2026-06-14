@@ -18,15 +18,17 @@
     <a href="https://tailwindcss.com/">
       <img src="https://img.shields.io/badge/Tailwind_CSS-38B2AC?logo=tailwind-css&logoColor=white" alt="Tailwind CSS" />
     </a>
-    <a href="https://cloudflare.com/">
-      <img src="https://img.shields.io/badge/Cloudflare-F38020?logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare" />
+    <a href="https://manage.teamsgc.in">
+      <img src="https://img.shields.io/badge/Deployed%20on-Cloudflare-F38020?logo=cloudflare&logoColor=white" alt="Deployed on Cloudflare" />
     </a>
   </p>
 </div>
 
 A comprehensive attendance and session management system built for the **Students Guidance Cell (SGC)** at **CAHCET**. Manage members, track attendance, handle session feedback, and generate reports — all with a clean, admin-friendly interface.
 
-**Live:** [https://manage.team.sgc](https://manage.team.sgc)
+> 📖 Explore the [full documentation](docs/) for architecture, setup, database schema, and deployment details.
+
+**Live:** [https://manage.teamsgc.in](https://manage.teamsgc.in)
 
 ---
 
@@ -134,6 +136,12 @@ Detailed documentation is available in the [`docs/`](docs/) directory:
 
 MIT — see [LICENSE](LICENSE).
 
-## Contributors
+## 🌟 Meet the Contributors
 
-Built and maintained by the **Students Guidance Cell** at **CAHCET**.
+[![Contributors](https://contrib.rocks/image?repo=sgc-cahcet/sgc-attendance)](https://github.com/sgc-cahcet/sgc-attendance/graphs/contributors)
+
+**Want your picture here?** 🖼️  
+Fork the repo, send a PR, and become a contributor!  
+Check out the [Contributing Guide](./CONTRIBUTING.md) to get started.
+
+Built and maintained with ❤️ by **Student Guidance Cell — CAHCET**.

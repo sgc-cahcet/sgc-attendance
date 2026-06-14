@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo } from "react"
 import { supabase } from "@/lib/supabase"
 import { useRouter } from "next/navigation"
 import { User } from "@supabase/supabase-js"
-import { ArrowLeft, Search, X } from "lucide-react"
+import { ArrowLeft, Loader, Search, X } from "lucide-react"
 import Link from "next/link"
 import Image from "next/image"
 
@@ -29,6 +29,7 @@ export default function MemberManagement() {
   const [selectedMembers, setSelectedMembers] = useState<number[]>([])
   const [searchQuery, setSearchQuery] = useState("")
   const [isDeleting, setIsDeleting] = useState(false)
+  const [deleteSuccess, setDeleteSuccess] = useState<string | null>(null)
   const router = useRouter()
   
   const emptyMember: Omit<Member, 'id'> = {
@@ -118,14 +119,42 @@ export default function MemberManagement() {
 
   const deleteSelectedMembers = async () => {
     if (selectedMembers.length === 0 || isDeleting) return
-
     setIsDeleting(true)
+
+    const { data: memberSessions, error: sessionFetchError } = await supabase
+      .from("sessions")
+      .select("id")
+      .in("handler_id", selectedMembers)
+
+    if (sessionFetchError) {
+      console.error("Error fetching member sessions:", sessionFetchError)
+      alert("Failed to fetch related sessions. Please try again.")
+      setIsDeleting(false)
+      return
+    }
+
+    const sessionIds = memberSessions?.map(s => s.id) ?? []
+
+    const { data: membersToDelete, error: membersFetchError } = await supabase
+      .from("members")
+      .select("email")
+      .in("id", selectedMembers)
+
+    if (membersFetchError) {
+      console.error("Error fetching member emails:", membersFetchError)
+      alert("Failed to fetch member details. Please try again.")
+      setIsDeleting(false)
+      return
+    }
+
+    const memberEmails = membersToDelete?.map(m => m.email).filter(Boolean) as string[] ?? []
 
     const memberDependencyTables = [
       { table: "attendance", label: "attendance data" },
       { table: "session_interests", label: "session interest data" },
       { table: "session_feedback", label: "session feedback data" },
       { table: "push_subscriptions", label: "push subscription data" },
+      { table: "notifications", label: "notification data" },
     ] as const
 
     for (const dependency of memberDependencyTables) {
@@ -142,11 +171,37 @@ export default function MemberManagement() {
       }
     }
 
+    if (sessionIds.length > 0) {
+      const { error: feedbackError } = await supabase
+        .from("session_feedback")
+        .delete()
+        .in("session_id", sessionIds)
+
+      if (feedbackError) {
+        console.error("Error deleting session feedback:", feedbackError)
+        alert("Failed to delete related session feedback. Please try again.")
+        setIsDeleting(false)
+        return
+      }
+
+      const { error: sessionsError } = await supabase
+        .from("sessions")
+        .delete()
+        .in("id", sessionIds)
+
+      if (sessionsError) {
+        console.error("Error deleting sessions:", sessionsError)
+        alert("Failed to delete related sessions. Please try again.")
+        setIsDeleting(false)
+        return
+      }
+    }
+
     const { error } = await supabase
       .from("members")
       .delete()
       .in("id", selectedMembers)
-    
+
     if (error) {
       console.error("Error deleting members:", error)
       alert("Failed to delete members. Please try again.")
@@ -154,10 +209,26 @@ export default function MemberManagement() {
       return
     }
 
+    if (memberEmails.length > 0) {
+      try {
+        await fetch("/api/admin/delete-user", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ emails: memberEmails }),
+        })
+      } catch (e) {
+        console.error("Error deleting auth users:", e)
+      }
+    }
+
     setSelectedMembers([])
     await fetchMembers()
     setShowDeleteDialog(false)
     setIsDeleting(false)
+    setDeleteSuccess(
+      `${selectedMembers.length} member${selectedMembers.length > 1 ? "s" : ""} deleted successfully`
+    )
+    setTimeout(() => setDeleteSuccess(null), 4000)
   }
 
   const toggleMemberSelection = (id: number) => {
@@ -219,6 +290,16 @@ export default function MemberManagement() {
 
   return (
     <div className="min-h-screen bg-[#f0f0f0] p-2 sm:p-4 md:p-8">
+      {deleteSuccess && (
+        <div className="fixed left-1/2 top-4 z-50 -translate-x-1/2 transform">
+          <div className="flex items-center justify-between rounded-md bg-green-500 px-4 py-2 text-white shadow-md">
+            <span>{deleteSuccess}</span>
+            <button onClick={() => setDeleteSuccess(null)} className="ml-2 text-white hover:text-gray-200">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
       <div className="max-w-7xl mx-auto">
         <Link 
           href="/admin/dashboard" 
@@ -348,7 +429,10 @@ export default function MemberManagement() {
                   When you delete a member, that member&apos;s attendance data will be deleted as well.
                 </p>
                 <p className="mb-2 text-sm font-medium text-red-700">
-                  Related session interests, session feedback, and push subscriptions will also be deleted.
+                  Related session interests, session feedback, push subscriptions, and notifications will also be deleted.
+                </p>
+                <p className="mb-2 text-sm font-medium text-red-700">
+                  Sessions where this member was the handler will also be deleted along with their feedback.
                 </p>
                 <p className="text-sm text-red-600 font-medium">
                   This action cannot be undone.
@@ -365,9 +449,9 @@ export default function MemberManagement() {
                 <button
                   onClick={deleteSelectedMembers}
                   disabled={isDeleting}
-                  className="px-6 py-2 bg-red-500 text-white font-bold rounded-md border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)]"
+                  className="px-6 py-2 bg-red-500 text-white font-bold rounded-md border-2 border-black shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] hover:translate-x-1 hover:translate-y-1 hover:shadow-none transition-all disabled:cursor-not-allowed disabled:opacity-60 disabled:hover:translate-x-0 disabled:hover:translate-y-0 disabled:hover:shadow-[4px_4px_0px_0px_rgba(0,0,0,1)] inline-flex items-center gap-2"
                 >
-                  {isDeleting ? "Deleting..." : "Delete"}
+                  {isDeleting ? <><Loader className="h-4 w-4 animate-spin" /> Deleting...</> : "Delete"}
                 </button>
               </div>
             </div>

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="/logo.png" alt="SGC Logo" width="120" />
+  <img src="/public/logo.png" alt="SGC Logo" width="120" />
   <h1 align="true">SGC Attendance Management System</h1>
   <p align="true">Students Guidance Cell — CAHCET</p>
   <p>

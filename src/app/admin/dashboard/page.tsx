@@ -52,7 +52,7 @@ export default function AdminDashboard() {
         return
       }
 
-      const allowedRoles = ["President", "Vice President", "Administrator"]
+      const allowedRoles = ["President", "Vice President", "Administrator", "Session Incharge"]
 
       // ❌ If not authorized, logout immediately
       if (!allowedRoles.includes(memberData.role)) {

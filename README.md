@@ -108,7 +108,7 @@ MIT — see [LICENSE](LICENSE).
 [![Contributors](https://contrib.rocks/image?repo=sgc-cahcet/sgc-attendance)](https://github.com/sgc-cahcet/sgc-attendance/graphs/contributors)
 
 **Want your picture here?** 🖼️  
-Fork the repo, send a PR, and become a contributor!  
+Fork the repo, send a PR, and become a contributor now!  
 Check out the [Contributing Guide](./CONTRIBUTING.md) to get started.
 
 Built and maintained with ❤️ by **Student Guidance Cell — CAHCET**.

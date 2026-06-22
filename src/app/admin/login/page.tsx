@@ -50,7 +50,7 @@ export default function AdminLogin() {
       if (memberError) throw memberError
       if (!memberData) throw new Error("Member record not found")
 
-      const allowedRoles = ["President", "Vice President", "Administrator"]
+      const allowedRoles = ["President", "Vice President", "Administrator", "Session Incharge"]
 
       if (!allowedRoles.includes(memberData.role)) {
         // Not authorized → sign out

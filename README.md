@@ -28,7 +28,7 @@
 
 > 📖 Explore the [full documentation](docs/) for architecture, setup, database schema, and deployment details.
 
-**Live:** [https://manage.teamsgc.in](https://manage.teamsgc.in/admin)
+**Live:** [https://manage.teamsgc.in/admin](https://manage.teamsgc.in/admin)
 
 ---
 
